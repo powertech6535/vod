@@ -10,17 +10,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ 拉取仓库
+      # 1️⃣ Checkout
       - name: Checkout repo
         uses: actions/checkout@v3
 
-      # 2️⃣ 安装工具
+      # 2️⃣ 安装依赖
       - name: Install Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y xmlstarlet curl
+          sudo apt-get install -y xmlstarlet curl sed
 
-      # 3️⃣ 下载所有 EPG 源（空文件或失败自动跳过）
+      # 3️⃣ 下载所有 EPG 源，空文件或下载失败自动跳过
       - name: Download All EPG Sources
         run: |
           mkdir -p epg_sources
@@ -48,23 +48,30 @@ jobs:
           done
           cd ..
 
-      # 4️⃣ 合并 channels 和 programmes（安全方式，不用 sed）
+      # 4️⃣ 删除 DOCTYPE 和 XML 声明，安全合并 channels 和 programmes
       - name: Merge Channels and Programmes
         run: |
           echo '<?xml version="1.0" encoding="UTF-8"?>' > epg.xml
           echo '<tv>' >> epg.xml
 
-          # 提取并合并 channels
+          # 删除 DOCTYPE 和 XML 声明
+          for f in epg_sources/*.xml; do
+            [ -s "$f" ] || continue
+            sed -i '/<!DOCTYPE/d' "$f"
+            sed -i '/<?xml/d' "$f"
+          done
+
+          # 合并 channels
           for f in epg_sources/*.xml; do
             [ -s "$f" ] || continue
             xmlstarlet sel -t -c "//channel" "$f" >> epg.xml
           done
 
-          # 去重 channel
+          # 去重 channels
           xmlstarlet ed -d '//channel[not(@id=preceding-sibling::channel/@id)]' epg.xml > epg_tmp.xml
           mv epg_tmp.xml epg.xml
 
-          # 提取并合并 programmes
+          # 合并 programmes
           for f in epg_sources/*.xml; do
             [ -s "$f" ] || continue
             xmlstarlet sel -t -c "//programme" "$f" >> epg.xml
