@@ -18,15 +18,16 @@ jobs:
       - name: Install Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y xmlstarlet curl sed
+          sudo apt-get install -y xmlstarlet curl
 
-      # 3️⃣ 下载 EPG 源（已去掉第5、6、7 URL）并校验
+      # 3️⃣ 下载 EPG 源
       - name: Download All EPG Sources
         run: |
           mkdir -p epg_sources
           cd epg_sources
 
           declare -A urls
+          # urls[1]="https://raw.githubusercontent.com/AqFad2811/epg/main/epg.xml"
           # urls[2]="https://raw.githubusercontent.com/AqFad2811/epg/main/unifitv.xml"
           urls[3]="https://raw.githubusercontent.com/AqFad2811/epg/main/astro.xml"
           urls[4]="https://raw.githubusercontent.com/azimabid00/epg/main/unifi_epg.xml"
@@ -38,22 +39,16 @@ jobs:
             echo "Downloading $URL..."
             curl -fSL --retry 5 --retry-delay 5 -o "$i.xml" "$URL"
 
-            # 检查文件大小
+            # 文件太小或不存在就跳过
             if [ ! -s "$i.xml" ] || [ $(stat -c%s "$i.xml") -lt 1000 ]; then
               echo "Warning: $i.xml may be incomplete, skipping."
               rm -f "$i.xml"
               continue
             fi
-
-            # 检查 XML 完整性
-            if ! xmlstarlet val -e "$i.xml"; then
-              echo "Warning: $i.xml is invalid XML, skipping."
-              rm -f "$i.xml"
-            fi
           done
           cd ..
 
-      # 4️⃣ 清理 XML 文件并合并，跳过无效文件
+      # 4️⃣ 强制提取并合并 <channel> 和 <programme>
       - name: Clean and Merge EPG
         run: |
           echo '<?xml version="1.0" encoding="UTF-8"?>' > epg.xml
@@ -62,23 +57,9 @@ jobs:
           for f in epg_sources/*.xml; do
             [ -s "$f" ] || continue
 
-            # 验证 XML 再次防止合并报错
-            if ! xmlstarlet val -e "$f"; then
-              echo "Skipping invalid file $f"
-              continue
-            fi
-
-            # 清理 XML 声明和根节点
-            sed -i '/<?xml/d' "$f"
-            sed -i '/<!DOCTYPE/d' "$f"
-            sed -i 's/<tv>//g' "$f"
-            sed -i 's/<\/tv>//g' "$f"
-
-            # 合并 channels
-            xmlstarlet sel -t -c "//channel" "$f" >> epg.xml
-
-            # 合并 programmes
-            xmlstarlet sel -t -c "//programme" "$f" >> epg.xml
+            # 提取 <channel>，跳过解析错误
+            xmlstarlet sel -t -c "//channel" "$f" 2>/dev/null >> epg.xml || echo "Skipping invalid <channel> in $f"
+            xmlstarlet sel -t -c "//programme" "$f" 2>/dev/null >> epg.xml || echo "Skipping invalid <programme> in $f"
           done
 
           echo '</tv>' >> epg.xml
