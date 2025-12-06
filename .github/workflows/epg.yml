@@ -48,7 +48,7 @@ jobs:
           done
           cd ..
 
-      # 4️⃣ 合并 channels 和 programmes（去掉 DTD，避免 Extra content）
+      # 4️⃣ 合并 channels 和 programmes（跳过空文件）
       - name: Merge Channels and Programmes
         run: |
           echo '<?xml version="1.0" encoding="UTF-8"?>' > epg.xml
