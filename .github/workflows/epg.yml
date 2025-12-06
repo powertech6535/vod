@@ -36,9 +36,8 @@ jobs:
               5) URL="https://i.mjh.nz/PlutoTV/all.xml" ;;
               6) URL="https://i.mjh.nz/SamsungTVPlus/us.xml" ;;
               7) URL="https://i.mjh.nz/SamsungTVPlus/kr.xml" ;;
-              8) URL="https://epg.pw/xmltv/epg_MY.xml" ;;
-              9) URL="https://raw.githubusercontent.com/azimabid00/epg/main/astro_epg.xml" ;;
-              10) URL="https://raw.githubusercontent.com/AqFad2811/epg/main/indonesia.xml" ;;
+              8) URL="https://raw.githubusercontent.com/azimabid00/epg/main/astro_epg.xml" ;;
+              9) URL="https://raw.githubusercontent.com/AqFad2811/epg/main/indonesia.xml" ;;
             esac
 
             curl -fSL -o "$i.xml" "$URL" || { echo "Download $URL failed"; exit 1; }
