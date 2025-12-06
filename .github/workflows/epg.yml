@@ -20,7 +20,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y xmlstarlet curl sed
 
-      # 3️⃣ 下载 EPG 源（去掉第5、6、7 URL）并校验
+      # 3️⃣ 下载 EPG 源（已去掉第5、6、7 URL）并校验
       - name: Download All EPG Sources
         run: |
           mkdir -p epg_sources
@@ -54,47 +54,43 @@ jobs:
           done
           cd ..
 
-      # 4️⃣ 清理 XML 文件并合并
+      # 4️⃣ 清理 XML 文件并合并，跳过无效文件
       - name: Clean and Merge EPG
         run: |
           echo '<?xml version="1.0" encoding="UTF-8"?>' > epg.xml
           echo '<tv>' >> epg.xml
 
-          # 清理 XML 声明, DOCTYPE, <tv> 标签
           for f in epg_sources/*.xml; do
             [ -s "$f" ] || continue
+
+            # 验证 XML 再次防止合并报错
+            if ! xmlstarlet val -e "$f"; then
+              echo "Skipping invalid file $f"
+              continue
+            fi
+
+            # 清理 XML 声明和根节点
             sed -i '/<?xml/d' "$f"
             sed -i '/<!DOCTYPE/d' "$f"
             sed -i 's/<tv>//g' "$f"
             sed -i 's/<\/tv>//g' "$f"
-          done
 
-          # 合并 channels
-          for f in epg_sources/*.xml; do
-            [ -s "$f" ] || continue
+            # 合并 channels
             xmlstarlet sel -t -c "//channel" "$f" >> epg.xml
-          done
 
-          # 去重 channels
-          xmlstarlet ed -d '//channel[not(@id=preceding-sibling::channel/@id)]' epg.xml > epg_tmp.xml
-          mv epg_tmp.xml epg.xml
-
-          # 合并 programmes
-          for f in epg_sources/*.xml; do
-            [ -s "$f" ] || continue
+            # 合并 programmes
             xmlstarlet sel -t -c "//programme" "$f" >> epg.xml
           done
-
-          # 去重 programmes：同频道同时间段只保留第一个
-          xmlstarlet ed -d '//programme[generate-id() != generate-id(key(concat(@channel, "-", @start), concat(@channel, "-", @start))[1])]' epg.xml > epg_tmp.xml || true
-          mv epg_tmp.xml epg.xml
 
           echo '</tv>' >> epg.xml
 
       # 5️⃣ 校验合并后的 XML
       - name: Validate Merged XML
         run: |
-          xmlstarlet val -e epg.xml
+          if ! xmlstarlet val -e epg.xml; then
+            echo "Merged epg.xml is invalid!"
+            exit 1
+          fi
 
       # 6️⃣ 上传到 Release
       - name: Upload EPG to Release
