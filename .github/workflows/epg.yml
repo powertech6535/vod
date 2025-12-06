@@ -18,7 +18,7 @@ jobs:
       - name: Install Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y xmlstarlet curl sed
+          sudo apt-get install -y xmlstarlet curl
 
       # 3️⃣ 下载所有 EPG 源（空文件或失败自动跳过）
       - name: Download All EPG Sources
@@ -48,7 +48,7 @@ jobs:
           done
           cd ..
 
-      # 4️⃣ 合并 channels 和 programmes（跳过空文件）
+      # 4️⃣ 合并 channels 和 programmes（安全方式，不用 sed）
       - name: Merge Channels and Programmes
         run: |
           echo '<?xml version="1.0" encoding="UTF-8"?>' > epg.xml
@@ -57,9 +57,6 @@ jobs:
           # 提取并合并 channels
           for f in epg_sources/*.xml; do
             [ -s "$f" ] || continue
-            # 删除 XML 声明和 DOCTYPE
-            sed -i '1,/<tv>/d' "$f"
-            sed -i '/<\/tv>/d' "$f"
             xmlstarlet sel -t -c "//channel" "$f" >> epg.xml
           done
 
