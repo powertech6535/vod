@@ -27,10 +27,11 @@ jobs:
           cd epg_sources
 
           declare -A urls
-          urls[1]="https://raw.githubusercontent.com/AqFad2811/epg/main/epg.xml"
           urls[2]="https://raw.githubusercontent.com/AqFad2811/epg/main/unifitv.xml"
           urls[3]="https://raw.githubusercontent.com/AqFad2811/epg/main/astro.xml"
-          urls[4]="https://raw.githubusercontent.com/AqFad2811/epg/main/indonesia.xml"
+          urls[4]="https://raw.githubusercontent.com/azimabid00/epg/main/unifi_epg.xml"
+          urls[8]="https://raw.githubusercontent.com/azimabid00/epg/main/astro_epg.xml"
+          urls[9]="https://raw.githubusercontent.com/AqFad2811/epg/main/indonesia.xml"
 
           for i in "${!urls[@]}"; do
             URL="${urls[$i]}"
