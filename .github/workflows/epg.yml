@@ -16,7 +16,7 @@ jobs:
       - name: Install Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y xmlstarlet curl
+          sudo apt-get install -y xmlstarlet curl sed
 
       - name: Download All EPG Sources
         run: |
@@ -33,12 +33,20 @@ jobs:
           curl -L -o 9.xml "https://raw.githubusercontent.com/azimabid00/epg/main/astro_epg.xml"
           curl -L -o 10.xml "https://raw.githubusercontent.com/AqFad2811/epg/main/indonesia.xml"
 
-      - name: Merge Channels with Logo
+      - name: Clean XMLTV Headers
+        run: |
+          for f in epg_sources/*.xml; do
+            # 删除 xml 声明和 DTD，保留内容
+            sed -i '1,/<tv>/d' "$f"
+            sed -i '/<\/tv>/d' "$f"
+          done
+
+      - name: Merge Channels and Programmes
         run: |
           echo '<?xml version="1.0" encoding="UTF-8"?>' > epg.xml
           echo '<tv>' >> epg.xml
 
-          # 合并 channel，保留 tvg-id, tvg-name, tvg-logo
+          # 合并 channel（保留 tvg-id, tvg-name, tvg-logo）
           for f in epg_sources/*.xml; do
             xmlstarlet sel -t -c "//channel" "$f" >> epg.xml
           done
