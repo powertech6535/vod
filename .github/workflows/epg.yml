@@ -1,13 +1,14 @@
-name: Merge EPG
+name: Merge EPG with Logo
 
 on:
   schedule:
-    - cron: "0 */6 * * *"   # 每 6 小时更新一次
+    - cron: "0 */6 * * *"
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
@@ -21,7 +22,6 @@ jobs:
         run: |
           mkdir epg_sources
           cd epg_sources
-
           curl -L -o 1.xml "https://raw.githubusercontent.com/AqFad2811/epg/main/epg.xml"
           curl -L -o 2.xml "https://raw.githubusercontent.com/AqFad2811/epg/main/unifitv.xml"
           curl -L -o 3.xml "https://raw.githubusercontent.com/AqFad2811/epg/main/astro.xml"
@@ -33,22 +33,31 @@ jobs:
           curl -L -o 9.xml "https://raw.githubusercontent.com/azimabid00/epg/main/astro_epg.xml"
           curl -L -o 10.xml "https://raw.githubusercontent.com/AqFad2811/epg/main/indonesia.xml"
 
-      - name: Merge All EPG Files
+      - name: Merge Channels with Logo
         run: |
           echo '<?xml version="1.0" encoding="UTF-8"?>' > epg.xml
           echo '<tv>' >> epg.xml
 
+          # 合并 channel，保留 tvg-id, tvg-name, tvg-logo
+          for f in epg_sources/*.xml; do
+            xmlstarlet sel -t -c "//channel" "$f" >> epg.xml
+          done
+
+          # 去重 channel
+          xmlstarlet ed -d '//channel[not(@id=preceding-sibling::channel/@id)]' epg.xml > epg_tmp.xml
+          mv epg_tmp.xml epg.xml
+
+          # 合并 programme
           for f in epg_sources/*.xml; do
             xmlstarlet sel -t -c "//programme" "$f" >> epg.xml
-            xmlstarlet sel -t -c "//channel" "$f" >> epg.xml
           done
 
           echo '</tv>' >> epg.xml
 
-      - name: Commit changes
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add epg.xml
-          git commit -m "Updated merged EPG" || echo "No changes"
-          git push
+      - name: Upload EPG to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: latest
+          files: epg.xml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
