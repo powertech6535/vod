@@ -2,7 +2,7 @@ name: Merge EPG
 
 on:
   schedule:
-    - cron: "0 */6 * * *"   # 每 6 小时自动更新
+    - cron: "0 */6 * * *"   # 每 6 小时更新一次
   workflow_dispatch:
 
 jobs:
@@ -22,17 +22,18 @@ jobs:
           mkdir epg_sources
           cd epg_sources
 
-          curl -L -o 1.xml "https://aqfadtv.xyz/epg"
-          curl -L -o 2.xml "https://raw.githubusercontent.com/AqFad2811/epg/main/epg.xml"
-          curl -L -o 3.xml "https://raw.githubusercontent.com/AqFad2811/epg/main/unifitv.xml"
-          curl -L -o 4.xml "https://raw.githubusercontent.com/AqFad2811/epg/main/astro.xml"
-          curl -L -o 5.xml "https://raw.githubusercontent.com/azimabid00/epg/main/unifi_epg.xml"
-          curl -L -o 6.xml "https://i.mjh.nz/PlutoTV/all.xml"
-          curl -L -o 7.xml "https://i.mjh.nz/SamsungTVPlus/us.xml"
-          curl -L -o 8.xml "https://i.mjh.nz/SamsungTVPlus/kr.xml"
-          curl -L -o 9.xml "https://epg.pw/xmltv/epg_MY.xml"
-          curl -L -o 10.xml "https://raw.githubusercontent.com/azimabid00/epg/main/astro_epg.xml"
-          curl -L -o 11.xml "https://raw.githubusercontent.com/AqFad2811/epg/main/indonesia.xml"
+          # 替换掉无法访问的 aqfadtv.xyz
+          curl -L -o 1.xml "https://raw.githubusercontent.com/AqFad2811/epg/main/epg.xml"
+          
+          curl -L -o 2.xml "https://raw.githubusercontent.com/AqFad2811/epg/main/unifitv.xml"
+          curl -L -o 3.xml "https://raw.githubusercontent.com/AqFad2811/epg/main/astro.xml"
+          curl -L -o 4.xml "https://raw.githubusercontent.com/azimabid00/epg/main/unifi_epg.xml"
+          curl -L -o 5.xml "https://i.mjh.nz/PlutoTV/all.xml"
+          curl -L -o 6.xml "https://i.mjh.nz/SamsungTVPlus/us.xml"
+          curl -L -o 7.xml "https://i.mjh.nz/SamsungTVPlus/kr.xml"
+          curl -L -o 8.xml "https://epg.pw/xmltv/epg_MY.xml"
+          curl -L -o 9.xml "https://raw.githubusercontent.com/azimabid00/epg/main/astro_epg.xml"
+          curl -L -o 10.xml "https://raw.githubusercontent.com/AqFad2811/epg/main/indonesia.xml"
 
       - name: Merge All EPG Files
         run: |
@@ -46,12 +47,9 @@ jobs:
 
           echo '</tv>' >> epg.xml
 
-      - name: Move output to repo
-        run: |
-          mv epg.xml epg.xml
-
       - name: Commit changes
         run: |
+          mv epg.xml epg.xml
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add epg.xml
