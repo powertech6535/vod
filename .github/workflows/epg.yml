@@ -1,8 +1,8 @@
-name: Merge EPG with Logo
+name: Merge EPG for OTT App
 
 on:
   schedule:
-    - cron: "0 */6 * * *" # 每 6 小时更新一次
+    - cron: "0 */6 * * *"  # 每 6 小时更新一次
   workflow_dispatch:
 
 jobs:
@@ -10,20 +10,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ 拉取仓库
       - name: Checkout repo
         uses: actions/checkout@v3
 
-      # 2️⃣ 安装工具
       - name: Install Tools
         run: |
           sudo apt-get update
           sudo apt-get install -y xmlstarlet curl sed
 
-      # 3️⃣ 下载所有 EPG 源（跳过无效 URL）
       - name: Download All EPG Sources
         run: |
-          mkdir epg_sources
+          mkdir -p epg_sources
           cd epg_sources
 
           declare -A urls
@@ -34,6 +31,7 @@ jobs:
           urls[5]="https://i.mjh.nz/PlutoTV/all.xml"
           urls[6]="https://i.mjh.nz/SamsungTVPlus/us.xml"
           urls[7]="https://i.mjh.nz/SamsungTVPlus/kr.xml"
+          # urls[8] 原 epg_MY.xml 已删除
           urls[8]="https://raw.githubusercontent.com/azimabid00/epg/main/astro_epg.xml"
           urls[9]="https://raw.githubusercontent.com/AqFad2811/epg/main/indonesia.xml"
 
@@ -42,7 +40,6 @@ jobs:
             if [[ "$URL" =~ ^https?:// ]]; then
               echo "Downloading $URL..."
               curl -fSL -o "$i.xml" "$URL" || echo "Warning: download failed for $URL, skipping."
-              # 验证文件非空
               if [ ! -s "$i.xml" ]; then
                 echo "Warning: $i.xml is empty, skipping."
                 rm -f "$i.xml"
@@ -53,35 +50,32 @@ jobs:
           done
           cd ..
 
-      # 4️⃣ 合并 channels 和 programmes
       - name: Merge Channels and Programmes
         run: |
           echo '<?xml version="1.0" encoding="UTF-8"?>' > epg.xml
           echo '<tv>' >> epg.xml
 
-          # 清理源文件 xml 声明和 DTD
           for f in epg_sources/*.xml; do
+            [ -s "$f" ] || continue
             sed -i '1,/<tv>/d' "$f"
             sed -i '/<\/tv>/d' "$f"
           done
 
-          # 合并 channel（保留 tvg-id, tvg-name, tvg-logo）
           for f in epg_sources/*.xml; do
+            [ -s "$f" ] || continue
             xmlstarlet sel -t -c "//channel" "$f" >> epg.xml
           done
 
-          # 去重 channel
           xmlstarlet ed -d '//channel[not(@id=preceding-sibling::channel/@id)]' epg.xml > epg_tmp.xml
           mv epg_tmp.xml epg.xml
 
-          # 合并 programme
           for f in epg_sources/*.xml; do
+            [ -s "$f" ] || continue
             xmlstarlet sel -t -c "//programme" "$f" >> epg.xml
           done
 
           echo '</tv>' >> epg.xml
 
-      # 5️⃣ 上传 Release，固定文件名 epg.xml
       - name: Upload EPG to Release
         uses: softprops/action-gh-release@v1
         with:
