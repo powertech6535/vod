@@ -20,37 +20,46 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y xmlstarlet curl sed
 
-      # 3️⃣ 下载所有 EPG 源（加验证防止空文件）
+      # 3️⃣ 下载所有 EPG 源（跳过无效 URL）
       - name: Download All EPG Sources
         run: |
           mkdir epg_sources
           cd epg_sources
 
-          for i in 1 2 3 4 5 6 7 8 9 10; do
-            URL=""
-            case $i in
-              1) URL="https://raw.githubusercontent.com/AqFad2811/epg/main/epg.xml" ;;
-              2) URL="https://raw.githubusercontent.com/AqFad2811/epg/main/unifitv.xml" ;;
-              3) URL="https://raw.githubusercontent.com/AqFad2811/epg/main/astro.xml" ;;
-              4) URL="https://raw.githubusercontent.com/azimabid00/epg/main/unifi_epg.xml" ;;
-              5) URL="https://i.mjh.nz/PlutoTV/all.xml" ;;
-              6) URL="https://i.mjh.nz/SamsungTVPlus/us.xml" ;;
-              7) URL="https://i.mjh.nz/SamsungTVPlus/kr.xml" ;;
-              8) URL="https://raw.githubusercontent.com/azimabid00/epg/main/astro_epg.xml" ;;
-              9) URL="https://raw.githubusercontent.com/AqFad2811/epg/main/indonesia.xml" ;;
-            esac
+          declare -A urls
+          urls[1]="https://raw.githubusercontent.com/AqFad2811/epg/main/epg.xml"
+          urls[2]="https://raw.githubusercontent.com/AqFad2811/epg/main/unifitv.xml"
+          urls[3]="https://raw.githubusercontent.com/AqFad2811/epg/main/astro.xml"
+          urls[4]="https://raw.githubusercontent.com/azimabid00/epg/main/unifi_epg.xml"
+          urls[5]="https://i.mjh.nz/PlutoTV/all.xml"
+          urls[6]="https://i.mjh.nz/SamsungTVPlus/us.xml"
+          urls[7]="https://i.mjh.nz/SamsungTVPlus/kr.xml"
+          urls[8]="https://raw.githubusercontent.com/azimabid00/epg/main/astro_epg.xml"
+          urls[9]="https://raw.githubusercontent.com/AqFad2811/epg/main/indonesia.xml"
 
-            curl -fSL -o "$i.xml" "$URL" || { echo "Download $URL failed"; exit 1; }
+          for i in "${!urls[@]}"; do
+            URL="${urls[$i]}"
+            if [[ "$URL" =~ ^https?:// ]]; then
+              echo "Downloading $URL..."
+              curl -fSL -o "$i.xml" "$URL" || echo "Warning: download failed for $URL, skipping."
+              # 验证文件非空
+              if [ ! -s "$i.xml" ]; then
+                echo "Warning: $i.xml is empty, skipping."
+                rm -f "$i.xml"
+              fi
+            else
+              echo "Warning: invalid URL for $i.xml, skipping."
+            fi
           done
           cd ..
 
-      # 4️⃣ 合并频道和节目
+      # 4️⃣ 合并 channels 和 programmes
       - name: Merge Channels and Programmes
         run: |
           echo '<?xml version="1.0" encoding="UTF-8"?>' > epg.xml
           echo '<tv>' >> epg.xml
 
-          # 清理源文件的 xml 声明和 DTD
+          # 清理源文件 xml 声明和 DTD
           for f in epg_sources/*.xml; do
             sed -i '1,/<tv>/d' "$f"
             sed -i '/<\/tv>/d' "$f"
@@ -72,7 +81,7 @@ jobs:
 
           echo '</tv>' >> epg.xml
 
-      # 5️⃣ 上传 Release，文件名固定 epg.xml
+      # 5️⃣ 上传 Release，固定文件名 epg.xml
       - name: Upload EPG to Release
         uses: softprops/action-gh-release@v1
         with:
