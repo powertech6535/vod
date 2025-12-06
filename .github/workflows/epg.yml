@@ -20,7 +20,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y xmlstarlet curl sed
 
-      # 3️⃣ 下载所有 EPG 源，空文件或下载失败自动跳过
+      # 3️⃣ 下载所有 EPG 源，去掉第5、6、7个
       - name: Download All EPG Sources
         run: |
           mkdir -p epg_sources
@@ -31,8 +31,9 @@ jobs:
           urls[2]="https://raw.githubusercontent.com/AqFad2811/epg/main/unifitv.xml"
           urls[3]="https://raw.githubusercontent.com/AqFad2811/epg/main/astro.xml"
           urls[4]="https://raw.githubusercontent.com/azimabid00/epg/main/unifi_epg.xml"
-          urls[5]="https://raw.githubusercontent.com/azimabid00/epg/main/astro_epg.xml"
-          urls[6]="https://raw.githubusercontent.com/AqFad2811/epg/main/indonesia.xml"
+          # 第5,6,7 URL 已删除
+          urls[8]="https://raw.githubusercontent.com/azimabid00/epg/main/astro_epg.xml"
+          urls[9]="https://raw.githubusercontent.com/AqFad2811/epg/main/indonesia.xml"
 
           for i in "${!urls[@]}"; do
             URL="${urls[$i]}"
@@ -45,17 +46,19 @@ jobs:
           done
           cd ..
 
-      # 4️⃣ 删除 DOCTYPE 和 XML 声明，安全合并 channels 和 programmes
-      - name: Merge Channels and Programmes
+      # 4️⃣ 清理 XML 文件并合并，修复截断标签
+      - name: Clean and Merge EPG
         run: |
           echo '<?xml version="1.0" encoding="UTF-8"?>' > epg.xml
           echo '<tv>' >> epg.xml
 
-          # 删除 DOCTYPE 和 XML 声明
+          # 删除 XML 声明, DOCTYPE, <tv> 标签
           for f in epg_sources/*.xml; do
             [ -s "$f" ] || continue
-            sed -i '/<!DOCTYPE/d' "$f"
             sed -i '/<?xml/d' "$f"
+            sed -i '/<!DOCTYPE/d' "$f"
+            sed -i 's/<tv>//g' "$f"
+            sed -i 's/<\/tv>//g' "$f"
           done
 
           # 合并 channels
@@ -74,9 +77,18 @@ jobs:
             xmlstarlet sel -t -c "//programme" "$f" >> epg.xml
           done
 
+          # 去重 programmes：同频道同时间段只保留第一个
+          xmlstarlet ed -d '//programme[generate-id() != generate-id(key(concat(@channel, "-", @start), concat(@channel, "-", @start))[1])]' epg.xml > epg_tmp.xml || true
+          mv epg_tmp.xml epg.xml
+
           echo '</tv>' >> epg.xml
 
-      # 5️⃣ 上传 Release，文件名固定 epg.xml
+      # 5️⃣ 校验 XML 完整性
+      - name: Validate XML
+        run: |
+          xmlstarlet val -e epg.xml
+
+      # 6️⃣ 上传 Release
       - name: Upload EPG to Release
         uses: softprops/action-gh-release@v1
         with:
