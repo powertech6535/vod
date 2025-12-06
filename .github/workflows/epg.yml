@@ -2,7 +2,7 @@ name: Merge EPG with Logo
 
 on:
   schedule:
-    - cron: "0 */6 * * *"
+    - cron: "0 */6 * * *" # 每 6 小时更新一次
   workflow_dispatch:
 
 jobs:
@@ -10,41 +10,52 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1️⃣ 拉取仓库
       - name: Checkout repo
         uses: actions/checkout@v3
 
+      # 2️⃣ 安装工具
       - name: Install Tools
         run: |
           sudo apt-get update
           sudo apt-get install -y xmlstarlet curl sed
 
+      # 3️⃣ 下载所有 EPG 源（加验证防止空文件）
       - name: Download All EPG Sources
         run: |
           mkdir epg_sources
           cd epg_sources
-          curl -L -o 1.xml "https://raw.githubusercontent.com/AqFad2811/epg/main/epg.xml"
-          curl -L -o 2.xml "https://raw.githubusercontent.com/AqFad2811/epg/main/unifitv.xml"
-          curl -L -o 3.xml "https://raw.githubusercontent.com/AqFad2811/epg/main/astro.xml"
-          curl -L -o 4.xml "https://raw.githubusercontent.com/azimabid00/epg/main/unifi_epg.xml"
-          curl -L -o 5.xml "https://i.mjh.nz/PlutoTV/all.xml"
-          curl -L -o 6.xml "https://i.mjh.nz/SamsungTVPlus/us.xml"
-          curl -L -o 7.xml "https://i.mjh.nz/SamsungTVPlus/kr.xml"
-          curl -L -o 8.xml "https://epg.pw/xmltv/epg_MY.xml"
-          curl -L -o 9.xml "https://raw.githubusercontent.com/azimabid00/epg/main/astro_epg.xml"
-          curl -L -o 10.xml "https://raw.githubusercontent.com/AqFad2811/epg/main/indonesia.xml"
 
-      - name: Clean XMLTV Headers
-        run: |
-          for f in epg_sources/*.xml; do
-            # 删除 xml 声明和 DTD，保留内容
-            sed -i '1,/<tv>/d' "$f"
-            sed -i '/<\/tv>/d' "$f"
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            URL=""
+            case $i in
+              1) URL="https://raw.githubusercontent.com/AqFad2811/epg/main/epg.xml" ;;
+              2) URL="https://raw.githubusercontent.com/AqFad2811/epg/main/unifitv.xml" ;;
+              3) URL="https://raw.githubusercontent.com/AqFad2811/epg/main/astro.xml" ;;
+              4) URL="https://raw.githubusercontent.com/azimabid00/epg/main/unifi_epg.xml" ;;
+              5) URL="https://i.mjh.nz/PlutoTV/all.xml" ;;
+              6) URL="https://i.mjh.nz/SamsungTVPlus/us.xml" ;;
+              7) URL="https://i.mjh.nz/SamsungTVPlus/kr.xml" ;;
+              8) URL="https://epg.pw/xmltv/epg_MY.xml" ;;
+              9) URL="https://raw.githubusercontent.com/azimabid00/epg/main/astro_epg.xml" ;;
+              10) URL="https://raw.githubusercontent.com/AqFad2811/epg/main/indonesia.xml" ;;
+            esac
+
+            curl -fSL -o "$i.xml" "$URL" || { echo "Download $URL failed"; exit 1; }
           done
+          cd ..
 
+      # 4️⃣ 合并频道和节目
       - name: Merge Channels and Programmes
         run: |
           echo '<?xml version="1.0" encoding="UTF-8"?>' > epg.xml
           echo '<tv>' >> epg.xml
+
+          # 清理源文件的 xml 声明和 DTD
+          for f in epg_sources/*.xml; do
+            sed -i '1,/<tv>/d' "$f"
+            sed -i '/<\/tv>/d' "$f"
+          done
 
           # 合并 channel（保留 tvg-id, tvg-name, tvg-logo）
           for f in epg_sources/*.xml; do
@@ -62,10 +73,12 @@ jobs:
 
           echo '</tv>' >> epg.xml
 
+      # 5️⃣ 上传 Release，文件名固定 epg.xml
       - name: Upload EPG to Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: latest
           files: epg.xml
+          overwrite: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
