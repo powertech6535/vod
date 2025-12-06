@@ -20,7 +20,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y xmlstarlet curl sed
 
-      # 3️⃣ 下载所有 EPG 源，去掉第5、6、7个
+      # 3️⃣ 下载 EPG 源（去掉第5、6、7 URL）并校验
       - name: Download All EPG Sources
         run: |
           mkdir -p epg_sources
@@ -31,28 +31,36 @@ jobs:
           urls[2]="https://raw.githubusercontent.com/AqFad2811/epg/main/unifitv.xml"
           urls[3]="https://raw.githubusercontent.com/AqFad2811/epg/main/astro.xml"
           urls[4]="https://raw.githubusercontent.com/azimabid00/epg/main/unifi_epg.xml"
-          # 第5,6,7 URL 已删除
           urls[8]="https://raw.githubusercontent.com/azimabid00/epg/main/astro_epg.xml"
           urls[9]="https://raw.githubusercontent.com/AqFad2811/epg/main/indonesia.xml"
 
           for i in "${!urls[@]}"; do
             URL="${urls[$i]}"
             echo "Downloading $URL..."
-            curl -fSL -o "$i.xml" "$URL" || echo "Warning: download failed for $URL, skipping."
-            if [ ! -s "$i.xml" ]; then
-              echo "Warning: $i.xml is empty, skipping."
+            curl -fSL --retry 5 --retry-delay 5 -o "$i.xml" "$URL"
+
+            # 检查文件大小
+            if [ ! -s "$i.xml" ] || [ $(stat -c%s "$i.xml") -lt 1000 ]; then
+              echo "Warning: $i.xml may be incomplete, skipping."
+              rm -f "$i.xml"
+              continue
+            fi
+
+            # 检查 XML 完整性
+            if ! xmlstarlet val -e "$i.xml"; then
+              echo "Warning: $i.xml is invalid XML, skipping."
               rm -f "$i.xml"
             fi
           done
           cd ..
 
-      # 4️⃣ 清理 XML 文件并合并，修复截断标签
+      # 4️⃣ 清理 XML 文件并合并
       - name: Clean and Merge EPG
         run: |
           echo '<?xml version="1.0" encoding="UTF-8"?>' > epg.xml
           echo '<tv>' >> epg.xml
 
-          # 删除 XML 声明, DOCTYPE, <tv> 标签
+          # 清理 XML 声明, DOCTYPE, <tv> 标签
           for f in epg_sources/*.xml; do
             [ -s "$f" ] || continue
             sed -i '/<?xml/d' "$f"
@@ -83,12 +91,12 @@ jobs:
 
           echo '</tv>' >> epg.xml
 
-      # 5️⃣ 校验 XML 完整性
-      - name: Validate XML
+      # 5️⃣ 校验合并后的 XML
+      - name: Validate Merged XML
         run: |
           xmlstarlet val -e epg.xml
 
-      # 6️⃣ 上传 Release
+      # 6️⃣ 上传到 Release
       - name: Upload EPG to Release
         uses: softprops/action-gh-release@v1
         with:
